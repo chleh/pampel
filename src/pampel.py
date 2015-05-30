@@ -771,11 +771,12 @@ def process_rerun(args):
                 cmdline = cmdline.split(" ")
             debuglog("cmdline", [ sys.argv[0] ] + cmdline[1:])
 
-            old_args = parser.parse_args(cmdline[1:]) # TODO what if imported
-            infolog("rerunning [#{}] with params:".format(
-                m.group(1)), " ".join(old_args.args) or "<None>")
+            old_args = parser.parse_args(cmdline[1:])    # TODO what if imported
+            infolog("rerunning [#{}]:".format(m.group(1)),
+                os.path.basename(sys.argv[0]), " ".join(cmdline[1:])
+                )
+            args.cmdline = [ sys.argv[0] ] + cmdline[1:] # TODO the params of parser_commmon are ignored
             args.args = old_args.args
-            args.cmdline = [ sys.argv[0] ] + cmdline[1:]
 
             if args.dry_run: return
 
