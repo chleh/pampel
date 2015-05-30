@@ -28,45 +28,33 @@ committer = author
 pampel_commit_re = re.compile(r'pampel [[]run #([0-9]+)[]]$', re.M)
 
 
-def _prepend_lines(fromfh, tofh):
-    # TODO problems with blocking read
-    for line in fromfh:
-        tofh.write("> " + line)
+# see http://stackoverflow.com/questions/14986490/python-change-sys-stdout-print-to-custom-print-function
+class _RedirectPrint():
+    def __init__(self, stdout):
+        self.old_stdout = stdout
+        self.nl = True
+
+    def write(self, text):
+        for l in text.splitlines(True):
+            if self.nl:
+                self.old_stdout.write('> ' + l)
+            else:
+                self.old_stdout.write(l)
+            self.nl = l.endswith("\n")
 
 @contextmanager
 def _redirect_12():
-    # NB: normal output will not work inside this context, also not inside this
-    # function (after yield)!
-    sys.stdout.flush()
-    sys.stderr.flush()
+    old_stdout = sys.stdout
+    old_stderr = sys.stderr
 
-    saved_stdout = sys.stdout
-    saved_stderr = sys.stderr
-
-    in_out, out_out = os.pipe()
-    in_err, out_err = os.pipe()
+    sys.stdout = _RedirectPrint(old_stdout)
+    sys.stdout = _RedirectPrint(old_stderr)
 
     try:
-        with os.fdopen(out_out, "w") as nout, os.fdopen(out_err, "w") as nerr:
-            sys.stdout = nout
-            sys.stderr = nerr
-
-            tout = Thread(target=_prepend_lines, args=(os.fdopen(in_out), saved_stdout))
-            tout.daemon = True
-            tout.start()
-            terr = Thread(target=_prepend_lines, args=(os.fdopen(in_err), saved_stderr))
-            terr.daemon = True
-            terr.start()
-
-            yield
+        yield
     finally:
-        sys.stdout = saved_stdout
-        sys.stderr = saved_stderr
-        sys.stdout.flush()
-        sys.stderr.flush()
-
-        tout.join()
-        terr.join()
+        sys.stdout = old_stdout
+        sys.stderr = old_stderr
 
 
 class LL:
@@ -893,8 +881,8 @@ def process_run(args, repo=None, do_commit=True):
                 with _redirect_12():
                     params = script.get_params()
             except Exception as e:
-                errorlog("script threw exception: {0}".format(e))
-                raise
+                errorlog("script threw exception: {}".format(e))
+                raise e
         else:
             infolog("running command {0}".format(" ".join(cmd + args.args)))
             startts = datetime.datetime.now()
