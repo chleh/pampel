@@ -1,0 +1,8 @@
+#!/usr/bin/python3
+
+assert __name__ == "__main__"
+
+from pampel.pampel import _run_main
+
+_run_main()
+
