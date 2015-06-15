@@ -817,6 +817,8 @@ def process_rerun(args):
 
                     repo.reset(repo.head.target, git.GIT_RESET_HARD)
                     commit = repo.head.peel()
+                    # TODO add color
+                    # modify exit status
                     infolog("HEAD now is at {} {}".format(str(commit.id)[:7], commit.message.split("\n",1)[0]))
             else:
                 infolog("No files changed during the rerun.")
