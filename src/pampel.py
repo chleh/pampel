@@ -16,7 +16,6 @@
 # along with pampel.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-
 import pygit2 as git
 
 import argparse
@@ -114,13 +113,14 @@ def is_colored():
             or (_COLORED_OUTPUT == "auto" and _OUT_TTY)
 
 
-def _general_log(minlevel, prefix, *args):
+def _general_log(minlevel, prefix, c, *args):
     indent = len(prefix)
     msg = " ".join(map(str, args))
     cont_prefix = " " * (indent-1) + "> "
     
-    c = _LOGCOLORS[minlevel] if is_colored() else ''
-    prefix = c + prefix + " "
+    # c = _LOGCOLORS[minlevel] if is_colored() else ''
+    if not is_colored(): c = ""
+    prefix = c + prefix + (" " if indent > 0 else "")
 
     if _LOGLEVEL >= minlevel:
         first_line = True
@@ -135,25 +135,25 @@ def _general_log(minlevel, prefix, *args):
         sys.stderr.write("\n")
 
 def fatallog(*args):
-    _general_log(LL.FATAL, "[FTL]", *args)
+    _general_log(LL.FATAL, "[FTL]", _LOGCOLORS[LL.FATAL], *args)
 
 def errorlog(*args):
-    _general_log(LL.ERROR, "[ERR]", *args)
+    _general_log(LL.ERROR, "[ERR]", _LOGCOLORS[LL.ERROR], *args)
 
 def warnlog(*args):
-    _general_log(LL.WARN,  "[WRN]", *args)
+    _general_log(LL.WARN,  "[WRN]", _LOGCOLORS[LL.WARN], *args)
 
 def infolog(*args):
-    _general_log(LL.INFO,  "[INF]", *args)
+    _general_log(LL.INFO,  "[INF]", _LOGCOLORS[LL.INFO], *args)
 
 def verblog(*args):
-    _general_log(LL.VERBOSE, "[DBG]", *args)
+    _general_log(LL.VERBOSE, "[DBG]", _LOGCOLORS[LL.VERBOSE], *args)
 
 def debuglog(*args):
-    _general_log(LL.DEBUG, "[DBG]", *args)
+    _general_log(LL.DEBUG, "[DBG]", _LOGCOLORS[LL.DEBUG], *args)
 
 def tracelog(*args):
-    _general_log(LL.TRACE, "[TRC]", *args)
+    _general_log(LL.TRACE, "[TRC]", _LOGCOLORS[LL.TRACE], *args)
 
 def colorlog(clr, *args):
     c = _color(clr) if is_colored() else ''
@@ -162,6 +162,12 @@ def colorlog(clr, *args):
             + (_color("none") if c else "")
             + "\n"
             )
+
+def goodlog(*args):
+    _general_log(LL.WARN, "", _color("green"), *args)
+
+def badlog(*args):
+    _general_log(LL.WARN, "", _color("red"), *args)
 
 
 class JsonFormattedEncoder:
@@ -758,6 +764,27 @@ def commit_conf(repo, conf):
     repo.create_commit('HEAD', author, committer, message, tree, [ repo.head.peel().id ])
 
 
+def status_to_str(s):
+    if s == git.GIT_STATUS_CURRENT:
+        return "CR"
+    elif s == git.GIT_STATUS_IGNORED:
+        return "IG"
+    elif s == git.GIT_STATUS_INDEX_DELETED:
+        return "ID"
+    elif s == git.GIT_STATUS_INDEX_MODIFIED:
+        return "IM"
+    elif s == git.GIT_STATUS_INDEX_NEW:
+        return "I?"
+    elif s == git.GIT_STATUS_WT_DELETED:
+        return " D"
+    elif s == git.GIT_STATUS_WT_MODIFIED:
+        return " M"
+    elif s == git.GIT_STATUS_WT_NEW:
+        return "??"
+    else:
+        return "--"
+
+
 # TODO lenient only for aux repos
 def process_rerun(args):
     repo, is_snapshot = open_repo(args.repo[0])
@@ -789,7 +816,7 @@ def process_rerun(args):
             process_run(args, repo, not is_snapshot)
 
             # print which files have changed
-            chfs = [ f for f, s in repo.status().items()
+            chfs = [ (f, s) for f, s in repo.status().items()
                     if s != git.GIT_STATUS_IGNORED
                     and f != ".pampel.json"
                     and f != ".pampel-commit" ]
@@ -799,7 +826,7 @@ def process_rerun(args):
                         for pat in il:
                             if fnmatch.fnmatch(f, pat): return True
                         return False
-                    do_ign = [ ign(args.ignore, f) for f in chfs ]
+                    do_ign = [ ign(args.ignore, f) for f, _ in chfs ]
 
                     igfs = [ f for i, f in enumerate(chfs) if do_ign[i] ]
                     chfs = [ f for i, f in enumerate(chfs) if not do_ign[i] ]
@@ -807,12 +834,16 @@ def process_rerun(args):
                     igfs = []
 
                 if igfs:
-                    infolog("Files that changed from previous run (ignored):\n" + "\n".join(sorted(igfs)))
+                    infolog("Files that changed from previous run (ignored):\n" + "\n".join(
+                        ( "{} {}".format(status_to_str(s), f) for f, s in sorted(igfs) )
+                        ))
 
                 if chfs:
-                    infolog("Files that changed from previous run:\n" + "\n".join(sorted(chfs)))
+                    infolog("Files that changed from previous run:\n" + "\n".join(
+                        ( "{} {}".format(status_to_str(s), f) for f, s in sorted(chfs) )
+                        ))
                 else:
-                    infolog("Rerun did not lead to any essential changes.")
+                    goodlog("Rerun did not lead to any essential changes.")
                     infolog("Resetting repository to the last commit.")
 
                     repo.reset(repo.head.target, git.GIT_RESET_HARD)
@@ -821,7 +852,7 @@ def process_rerun(args):
                     # modify exit status
                     infolog("HEAD now is at {} {}".format(str(commit.id)[:7], commit.message.split("\n",1)[0]))
             else:
-                infolog("No files changed during the rerun.")
+                goodlog("No files changed during the rerun.")
 
             if args.test and len(chfs) != 0:
                 infolog("You can use `git diff' and `git status' to view changes between this and the previous run\n"
