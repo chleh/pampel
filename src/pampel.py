@@ -351,7 +351,7 @@ class PampelConfig:
             snapshot = git.Repository(path)
         except Exception as e:
             errorlog("could not open repository at {} ({}):\n{}".format(path, type(e).__name__, e))
-            raise e
+            raise
 
         # check that snapshot really is shared with repo
         for l in open(os.path.join(snapshot.path, "objects", "info", "alternates"), "r"):
@@ -908,7 +908,7 @@ def process_run(args, repo=None, do_commit=True):
                     script = imp.load_source("script", cmd[0])
             except Exception as e:
                 fatallog("importing script {} failed:\n{}".format(cmd[0], e))
-                raise e
+                raise
             script_args = {}
             for kv in args.args:
                 k, v = kv.split("=", 2)
@@ -932,7 +932,7 @@ def process_run(args, repo=None, do_commit=True):
                     params = script.get_params()
             except Exception as e:
                 errorlog("script threw exception: {}".format(e))
-                raise e
+                raise
         else:
             infolog("running command {0}".format(" ".join(cmd + args.args)))
             startts = datetime.datetime.now()
