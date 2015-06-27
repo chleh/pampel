@@ -35,7 +35,7 @@ from contextlib import contextmanager
 from threading import Thread
 
 
-PROG = os.path.basename(sys.argv[0])
+PROG = os.path.basename(sys.argv[0]) or "pampel"
 
 out_dir_re = re.compile("out($|-?)") # output dirs are either "out" or "out-*"
 author = git.Signature(PROG, PROG)
@@ -905,7 +905,10 @@ def process_run(args, repo=None, do_commit=True):
 
             try:
                 with _redirect_12():
+                    old_path = sys.path.copy()
+                    sys.path.append(os.path.dirname(cmd[0])) # allows "local" imports from cmd[0]
                     script = imp.load_source("script", cmd[0])
+                    sys.path = old_path # TODO maybe reset this later s.t. script can make delayed imports
             except Exception as e:
                 fatallog("importing script {} failed:\n{}".format(cmd[0], e))
                 raise
@@ -919,6 +922,7 @@ def process_run(args, repo=None, do_commit=True):
                 with _redirect_12():
                     script.init(script_args)
 
+                # TODO output certain messages only on error
                 infolog("running script")
                 startts = datetime.datetime.now()
                 with _redirect_12():
