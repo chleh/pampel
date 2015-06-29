@@ -16,6 +16,8 @@
 # along with pampel.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+# TODO warn when too lenient
+
 import pygit2 as git
 
 import argparse
@@ -1072,12 +1074,13 @@ def add_snapshot_multi(repo, args):
     if not args.any_branch:
         # build branch hierarchy
         # TODO stop if first effective branch point is found
-        map_commit_ref = {}
+        map_commit_ref = {} # map commit id -> [ reference name, ... ]
         for refn in repo.listall_references():
             if refn.startswith("refs/heads/"):
                 ref = repo.lookup_reference(refn)
 
                 for commit in repo.walk(ref.peel().id, git.GIT_SORT_TIME):
+                    tracelog("commit", commit.id, commit.message.splitlines()[0])
                     m = pampel_commit_re.match(commit.message)
                     if m:
                         if max_run is not None and max_run < int(m.group(1)):
@@ -1106,8 +1109,10 @@ def add_snapshot_multi(repo, args):
     curr_branch_refs = None
 
     has_old_bound = min_run is not None or end_ref is not None
+    tracelog("end_ref", end_ref)
 
     for commit in repo.walk(start_ref, git.GIT_SORT_TIME):
+        tracelog("commit2", commit.id, commit.message.splitlines()[0])
         m = pampel_commit_re.match(commit.message)
         if m:
             if max_run is not None and max_run < int(m.group(1)):
@@ -1126,11 +1131,16 @@ def add_snapshot_multi(repo, args):
             run_info = json_obj["run info"]
             commits.append((commit, params, run_info))
 
+            if min_run is not None and min_run == int(m.group(1)):
+                # skip commits which are too old
+                break
+
         if commit.id == end_ref:
             break
 
         if has_old_bound and (not args.any_branch) \
                 and curr_branch_refs is not None \
+                and commit.id in map_commit_ref \
                 and map_commit_ref[commit.id] != curr_branch_refs:
             break
 
