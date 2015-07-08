@@ -1108,9 +1108,6 @@ def add_snapshot_multi(repo, args):
     commits = []
     curr_branch_refs = None
 
-    has_old_bound = min_run is not None or end_ref is not None
-    tracelog("end_ref", end_ref)
-
     for commit in repo.walk(start_ref, git.GIT_SORT_TIME):
         tracelog("commit2", commit.id, commit.message.splitlines()[0])
         m = pampel_commit_re.match(commit.message)
@@ -1138,7 +1135,7 @@ def add_snapshot_multi(repo, args):
         if commit.id == end_ref:
             break
 
-        if has_old_bound and (not args.any_branch) \
+        if (not args.any_branch) \
                 and curr_branch_refs is not None \
                 and commit.id in map_commit_ref \
                 and map_commit_ref[commit.id] != curr_branch_refs:
