@@ -386,15 +386,22 @@ class PampelConfig:
         new_repo.checkout(br)
 
 
-def get_snapshot_dir(props, run_info, param_map=None, value_map=None):
+def get_snapshot_dir(props, run_info, tag, param_map=None, value_map=None):
     get_param = lambda k:    param_map[k]    if param_map is not None else k
     get_value = lambda k, v: value_map[k][v] if value_map is not None else v
 
     run_str = "{:03}".format(run_info["run count"])
-    par_str = " ".join([
-                "{}={}".format(get_param(k), get_value(k, v))
-                for k, v in sorted(props.items())
-                ])
+
+    if tag:
+        parts = [ tag ]
+    else:
+        parts = []
+
+    parts += [
+            "{}={}".format(get_param(k), get_value(k, v))
+            for k, v in sorted(props.items())
+            ]
+    par_str = " ".join(parts)
 
     dirname = run_str
     if par_str: 
@@ -1109,7 +1116,6 @@ def add_snapshot_multi(repo, args):
     curr_branch_refs = None
 
     for commit in repo.walk(start_ref, git.GIT_SORT_TIME):
-        tracelog("commit2", commit.id, commit.message.splitlines()[0])
         m = pampel_commit_re.match(commit.message)
         if m:
             if max_run is not None and max_run < int(m.group(1)):
@@ -1165,6 +1171,12 @@ def add_snapshot_multi(repo, args):
     with PampelConfig(repo) as conf:
         new_repos = []
 
+        map_commit_tag = {}
+        for r in repo.listall_references():
+            if not r.startswith("refs/tags/"): continue
+            n = r[len("refs/tags/"):]
+            map_commit_tag[repo.lookup_reference(r).get_object().id] = n
+
         for par, coms in classes:
             # choose latest commit from each class
             commit, run_info = max(coms, key=lambda c: c[0].commit_time)
@@ -1175,7 +1187,11 @@ def add_snapshot_multi(repo, args):
                 if k not in common_params:
                     props[k] = v
 
-            dirname = get_snapshot_dir(props, run_info, param_map, value_map)
+            try:
+                tag = map_commit_tag[commit.id]
+            except KeyError:
+                tag = None
+            dirname = get_snapshot_dir(props, run_info, tag, param_map, value_map)
             assert dirname not in info_content_dist
             info_content_dist[dirname] = props
 
