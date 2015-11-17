@@ -914,7 +914,7 @@ def process_run(args, repo=None, do_commit=True):
 
             try:
                 with _redirect_12():
-                    old_path = sys.path.copy()
+                    old_path = list(sys.path)
                     sys.path.append(os.path.dirname(cmd[0])) # allows "local" imports from cmd[0]
                     script = imp.load_source("script", cmd[0])
                     sys.path = old_path # TODO maybe reset this later s.t. script can make delayed imports
